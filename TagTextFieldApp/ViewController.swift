@@ -83,7 +83,15 @@ class ViewController: UIViewController, UITextViewDelegate {
             button.backgroundColor = tag.color
             button.setTitleColor(.white, for: .normal)
             button.layer.cornerRadius = 15
-            button.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 10)
+            if #available(iOS 15.0, *) {
+                        // iOS 15以降ではcontentInsetsを使用する
+                        button.configuration = UIButton.Configuration.plain()
+                        button.configuration?.titlePadding = 10
+                        button.configuration?.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
+                    } else {
+                        // iOS 12以下ではcontentEdgeInsetsを使用する
+                        button.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 10)
+                    }
             button.addTarget(self, action: #selector(tagButtonTapped(_:)), for: .touchUpInside)
             tagStackView.addArrangedSubview(button)
         }
@@ -95,41 +103,47 @@ class ViewController: UIViewController, UITextViewDelegate {
     }
     
     private func insertTag(_ tagText: String) {
-        let attributedString = NSMutableAttributedString(attributedString: textView.attributedText)
         let tag = tags.first { $0.text == tagText }
         
-        let tagAttributes: [NSAttributedString.Key: Any] = [
-            .backgroundColor: tag?.color ?? .clear,
-            .font: UIFont.systemFont(ofSize: 16)
-        ]
+        // UILabel を作成して角丸の背景を持つビューを準備する
+        let label = UILabel()
+        label.text = tagText
+        label.backgroundColor = tag?.color ?? .clear
+        label.textColor = .white
+        label.font = UIFont.systemFont(ofSize: 16)
+        label.textAlignment = .center
+        label.layer.cornerRadius = 5
+        label.layer.masksToBounds = true // 角丸を表示するために必要
+        label.sizeToFit() // 必要に応じてサイズを調整する
         
-        let spaceAttributes: [NSAttributedString.Key: Any] = [
-            .backgroundColor: UIColor.clear,
-            .font: UIFont.systemFont(ofSize: 16)
-        ]
+        // UILabel を画像に変換する
+        let renderer = UIGraphicsImageRenderer(size: label.bounds.size)
+        let image = renderer.image { _ in
+            label.layer.render(in: UIGraphicsGetCurrentContext()!)
+        }
         
+        // NSTextAttachment で画像を設定する
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        
+        // NSAttributedString を作成する
+        let attributedString = NSAttributedString(attachment: attachment)
+        
+        // 挿入ポイントを取得する
         let insertionPoint = textView.selectedRange.location
         
-        // 前の空白を挿入
-        let frontSpaceString = NSAttributedString(string: " ", attributes: spaceAttributes)
-        attributedString.insert(frontSpaceString, at: insertionPoint)
+        // attributedText を編集する
+        let mutableAttributedString = NSMutableAttributedString(attributedString: textView.attributedText)
+        mutableAttributedString.insert(attributedString, at: insertionPoint)
+        textView.attributedText = mutableAttributedString
         
-        // タグを挿入
-        let tagAttributedString = NSAttributedString(string: tagText, attributes: tagAttributes)
-        attributedString.insert(tagAttributedString, at: insertionPoint + 1)
-        
-        // 後ろの空白を挿入
-        let backSpaceString = NSAttributedString(string: " ", attributes: spaceAttributes)
-        attributedString.insert(backSpaceString, at: insertionPoint + tagText.count + 1)
-        
-        textView.attributedText = attributedString
-        
-        // タグの範囲を記録（空白を含む）
+        // 挿入したタグの範囲を記録する（空白を含む）
         insertedTags.append(NSRange(location: insertionPoint, length: tagText.count + 2))
         
-        // カーソルを移動
+        // カーソルを移動する
         textView.selectedRange = NSRange(location: insertionPoint + tagText.count + 2, length: 0)
     }
+
     
     func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
         // キーボードのDeleteキーが押されたかどうかを確認
