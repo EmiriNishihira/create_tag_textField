@@ -114,7 +114,6 @@ class ViewController: UIViewController, UITextViewDelegate {
         label.textAlignment = .center
         label.layer.cornerRadius = 4
         label.layer.masksToBounds = true // 角丸を表示するために必要
-//        label.sizeToFit() // 必要に応じてサイズを調整する
         let paddedFrame = label.frame.inset(by: UIEdgeInsets(top: 20, left: 30, bottom: 5, right: 20))
         label.frame = paddedFrame
         
@@ -131,12 +130,20 @@ class ViewController: UIViewController, UITextViewDelegate {
         // NSAttributedString を作成する
         let attributedString = NSAttributedString(attachment: attachment)
         
+        // 挿入するテキストの前後に1pxのスペースを追加する
+        let spaceBefore = NSAttributedString(string: " ", attributes: [.kern: 1])
+        let spaceAfter = NSAttributedString(string: " ", attributes: [.kern: 1])
+
         // 挿入ポイントを取得する
         let insertionPoint = textView.selectedRange.location
         
         // attributedText を編集する
         let mutableAttributedString = NSMutableAttributedString(attributedString: textView.attributedText)
         mutableAttributedString.insert(attributedString, at: insertionPoint)
+        
+        mutableAttributedString.insert(spaceBefore, at: insertionPoint)
+        mutableAttributedString.append(spaceAfter)
+        
         textView.attributedText = mutableAttributedString
         
         // 挿入したタグの範囲を記録する（空白を含む）
