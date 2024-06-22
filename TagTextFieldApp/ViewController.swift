@@ -112,9 +112,11 @@ class ViewController: UIViewController, UITextViewDelegate {
         label.textColor = .white
         label.font = UIFont.systemFont(ofSize: 16)
         label.textAlignment = .center
-        label.layer.cornerRadius = 5
+        label.layer.cornerRadius = 4
         label.layer.masksToBounds = true // 角丸を表示するために必要
-        label.sizeToFit() // 必要に応じてサイズを調整する
+//        label.sizeToFit() // 必要に応じてサイズを調整する
+        let paddedFrame = label.frame.inset(by: UIEdgeInsets(top: 20, left: 30, bottom: 5, right: 20))
+        label.frame = paddedFrame
         
         // UILabel を画像に変換する
         let renderer = UIGraphicsImageRenderer(size: label.bounds.size)
