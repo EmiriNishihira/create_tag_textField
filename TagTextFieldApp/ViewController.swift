@@ -38,8 +38,9 @@ class ViewController: UIViewController, UITextViewDelegate {
         Tag(text: "薬", color: .orange),
         Tag(text: "発作", color: .red)
     ]
-    
+
     private var insertedTags: [NSRange] = []
+    var tagText = ""
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -84,14 +85,14 @@ class ViewController: UIViewController, UITextViewDelegate {
             button.setTitleColor(.white, for: .normal)
             button.layer.cornerRadius = 15
             if #available(iOS 15.0, *) {
-                        // iOS 15以降ではcontentInsetsを使用する
-                        button.configuration = UIButton.Configuration.plain()
-                        button.configuration?.titlePadding = 10
-                        button.configuration?.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
-                    } else {
-                        // iOS 12以下ではcontentEdgeInsetsを使用する
-                        button.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 10)
-                    }
+                // iOS 15以降ではcontentInsetsを使用する
+                button.configuration = UIButton.Configuration.plain()
+                button.configuration?.titlePadding = 10
+                button.configuration?.contentInsets = NSDirectionalEdgeInsets(top: 5, leading: 10, bottom: 5, trailing: 10)
+            } else {
+                // iOS 12以下ではcontentEdgeInsetsを使用する
+                button.contentEdgeInsets = UIEdgeInsets(top: 5, left: 10, bottom: 5, right: 10)
+            }
             button.addTarget(self, action: #selector(tagButtonTapped(_:)), for: .touchUpInside)
             tagStackView.addArrangedSubview(button)
         }
@@ -117,19 +118,12 @@ class ViewController: UIViewController, UITextViewDelegate {
         let paddedFrame = label.frame.inset(by: UIEdgeInsets(top: 20, left: 30, bottom: 5, right: 20))
         label.frame = paddedFrame
         
-        // UILabel を画像に変換する
-        let renderer = UIGraphicsImageRenderer(size: label.bounds.size)
-        let image = renderer.image { _ in
-            label.layer.render(in: UIGraphicsGetCurrentContext()!)
-        }
-        
-        // NSTextAttachment で画像を設定する
-        let attachment = NSTextAttachment()
-        attachment.image = image
-        
-        // NSAttributedString を作成する
-        let attributedString = NSAttributedString(attachment: attachment)
-        
+        let attributedString = NSAttributedString(string: label.text ?? "", attributes: [
+            .backgroundColor: label.backgroundColor ?? .clear,
+            .foregroundColor: label.textColor ?? .black,
+            .font: label.font ?? UIFont.systemFont(ofSize: 16)
+        ])
+
         // 挿入するテキストの前後に1pxのスペースを追加する
         let spaceBefore = NSAttributedString(string: " ", attributes: [.kern: 1])
         let spaceAfter = NSAttributedString(string: " ", attributes: [.kern: 1])
@@ -148,59 +142,17 @@ class ViewController: UIViewController, UITextViewDelegate {
         
         // 挿入したタグの範囲を記録する（空白を含む）
         insertedTags.append(NSRange(location: insertionPoint, length: tagText.count + 2))
-        
+        self.tagText.append(tagText + textView.text)
         // カーソルを移動する
         textView.selectedRange = NSRange(location: insertionPoint + tagText.count + 2, length: 0)
     }
 
     
-    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        // キーボードのDeleteキーが押されたかどうかを確認
-        if text == "" && range.length == 0 {
-            // Deleteキーが押されており、かつ置換テキストが空文字の場合
-            
-            // 現在のカーソル位置を取得
-            let cursorPosition = textView.selectedRange.location
-            
-            // 削除するタグの範囲を探す
-            for tagRange in insertedTags {
-                if cursorPosition == tagRange.location {
-                    // カーソル位置がタグの開始位置と一致する場合、そのタグを削除
-                    
-                    // タグ全体（開始の空白、タグ、終端の空白）を削除
-                    let deleteRange = NSRange(location: tagRange.location, length: tagRange.length + 1)
-                    let attributedString = NSMutableAttributedString(attributedString: textView.attributedText)
-                    attributedString.replaceCharacters(in: deleteRange, with: "")
-                    textView.attributedText = attributedString
-                    
-                    // 更新後のタグ範囲を再計算
-                    updateTagRanges()
-                    
-                    // カーソル位置を移動
-                    textView.selectedRange = NSRange(location: deleteRange.location, length: 0)
-                    
-                    return false  // テキストの置換を行わない（タグを削除したので）
-                }
-            }
-        }
-        
-        return true
+    func textViewDidChange(_ textView: UITextView) {
+        let attributedText = textView.attributedText
+        print("文字を出力:", attributedText)
     }
 
-    
-    func textViewDidChange(_ textView: UITextView) {
-        updateTagRanges()
-    }
-    
-    private func updateTagRanges() {
-        insertedTags.removeAll()
-        let fullRange = NSRange(location: 0, length: textView.text.count)
-        textView.attributedText.enumerateAttribute(.backgroundColor, in: fullRange, options: []) { (value, range, _) in
-            if value != nil, range.length > 2 {
-                insertedTags.append(range)
-            }
-        }
-    }
 }
 
 struct Tag {
