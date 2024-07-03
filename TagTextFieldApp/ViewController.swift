@@ -39,7 +39,7 @@ class ViewController: UIViewController, UITextViewDelegate {
         Tag(text: "発作", color: .red)
     ]
 
-    private var insertedTags: [NSRange] = []
+    private var insertedTips: [NSRange] = []
     var tagText = ""
 
     override func viewDidLoad() {
@@ -141,8 +141,8 @@ class ViewController: UIViewController, UITextViewDelegate {
         textView.attributedText = mutableAttributedString
         
         // 挿入したタグの範囲を記録する（空白を含む）
-        insertedTags.append(NSRange(location: insertionPoint, length: tagText.count + 2))
-        self.tagText.append(tagText + textView.text)
+        insertedTips.append(NSRange(location: insertionPoint, length: tagText.count + 2))
+
         // カーソルを移動する
         textView.selectedRange = NSRange(location: insertionPoint + tagText.count + 2, length: 0)
     }
@@ -151,6 +151,28 @@ class ViewController: UIViewController, UITextViewDelegate {
     func textViewDidChange(_ textView: UITextView) {
         let attributedText = textView.attributedText
         print("文字を出力:", attributedText)
+    }
+    
+    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
+        if text.isEmpty {
+            for tipRange in insertedTips {
+                if NSIntersectionRange(range, tipRange).length > 0 {
+                    
+                    textView.textStorage.beginEditing()
+                    textView.textStorage.deleteCharacters(in: tipRange)
+                    textView.textStorage.endEditing()
+                    insertedTips = insertedTips.filter { $0 != tipRange }
+                    
+                    let cursorPosition = tipRange.location
+                    if let newPosition = textView.position(from: textView.beginningOfDocument, offset: cursorPosition) {
+                        textView.selectedTextRange = textView.textRange(from: newPosition, to: newPosition)
+                    }
+                    
+                    return false
+                }
+            }
+        }
+        return true
     }
 
 }
