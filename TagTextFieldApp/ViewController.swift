@@ -32,15 +32,24 @@ class ViewController: UIViewController, UITextViewDelegate {
     }()
     
     private var tags: [Tag] = [
-        Tag(text: "嘔吐", color: .red),
-        Tag(text: "うんち", color: .red),
-        Tag(text: "ご飯", color: .orange),
-        Tag(text: "薬", color: .orange),
-        Tag(text: "発作", color: .red)
+        Tag(id: 1, text: "嘔吐", color: .red),
+        Tag(id: 2, text: "うんち", color: .red),
+        Tag(id: 3, text: "ご飯", color: .orange),
+        Tag(id: 4, text: "薬", color: .orange),
+        Tag(id: 5, text: "発作", color: .red)
+    ]
+    
+    // サーバーに送る文字列のモデル　復元の仕方を話し合う
+    private var dataTags: [Tag] = [
+        Tag(id: 1, text: "$嘔吐$", color: .red),
+        Tag(id: 2, text: "$うんち$", color: .red),
+        Tag(id: 3, text: "$ご飯$", color: .orange),
+        Tag(id: 4, text: "$薬$", color: .orange),
+        Tag(id: 5, text: "$発作$", color: .red)
     ]
 
     private var insertedTips: [NSRange] = []
-    var tagText = ""
+    var allTipText: [String] = []
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -114,16 +123,28 @@ class ViewController: UIViewController, UITextViewDelegate {
         label.font = UIFont.systemFont(ofSize: 16)
         label.textAlignment = .center
         label.layer.cornerRadius = 4
-        label.layer.masksToBounds = true // 角丸を表示するために必要
+        label.layer.masksToBounds = true
         let paddedFrame = label.frame.inset(by: UIEdgeInsets(top: 20, left: 30, bottom: 5, right: 20))
         label.frame = paddedFrame
         
-        let attributedString = NSAttributedString(string: label.text ?? "", attributes: [
-            .backgroundColor: label.backgroundColor ?? .clear,
-            .foregroundColor: label.textColor ?? .black,
-            .font: label.font ?? UIFont.systemFont(ofSize: 16)
+        // UILabel を画像に変換する
+        let renderer = UIGraphicsImageRenderer(size: label.bounds.size)
+        let image = renderer.image { _ in
+            label.layer.render(in: UIGraphicsGetCurrentContext()!)
+        }
+        
+        guard let filterdTag = tags.first(where: { $0.text == tagText }) else {
+            return
+        }
+        let tagFromServer = "$\(filterdTag.text)$"
+        
+        let attachment = NSTextAttachment()
+        attachment.image = image
+        let testIDKey = NSAttributedString.Key(rawValue: "testID")
+        let tip = NSMutableAttributedString(string: "\(UnicodeScalar(NSTextAttachment.character)!)", attributes: [
+            testIDKey: tagFromServer, .attachment: attachment
         ])
-
+        
         // 挿入するテキストの前後に1pxのスペースを追加する
         let spaceBefore = NSAttributedString(string: " ", attributes: [.kern: 1])
         let spaceAfter = NSAttributedString(string: " ", attributes: [.kern: 1])
@@ -133,7 +154,7 @@ class ViewController: UIViewController, UITextViewDelegate {
         
         // attributedText を編集する
         let mutableAttributedString = NSMutableAttributedString(attributedString: textView.attributedText)
-        mutableAttributedString.insert(attributedString, at: insertionPoint)
+        mutableAttributedString.insert(tip, at: insertionPoint)
         
         mutableAttributedString.insert(spaceBefore, at: insertionPoint)
         mutableAttributedString.append(spaceAfter)
@@ -145,39 +166,39 @@ class ViewController: UIViewController, UITextViewDelegate {
 
         // カーソルを移動する
         textView.selectedRange = NSRange(location: insertionPoint + tagText.count + 2, length: 0)
+        
+        
+        let range = NSRange(location: 0, length: mutableAttributedString.string.count)
+        allTipText = []
+        // Custom Keyから値を取り出す
+        mutableAttributedString.enumerateAttribute(testIDKey, in: range) { result, resultRange, _ in
+            guard let result = result as? String else { return }
+            
+            allTipText.append(result)
+        }
+        
     }
 
     
     func textViewDidChange(_ textView: UITextView) {
-        let attributedText = textView.attributedText
-        print("文字を出力:", attributedText)
-    }
-    
-    func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText text: String) -> Bool {
-        if text.isEmpty {
-            for tipRange in insertedTips {
-                if NSIntersectionRange(range, tipRange).length > 0 {
-                    
-                    textView.textStorage.beginEditing()
-                    textView.textStorage.deleteCharacters(in: tipRange)
-                    textView.textStorage.endEditing()
-                    insertedTips = insertedTips.filter { $0 != tipRange }
-                    
-                    let cursorPosition = tipRange.location
-                    if let newPosition = textView.position(from: textView.beginningOfDocument, offset: cursorPosition) {
-                        textView.selectedTextRange = textView.textRange(from: newPosition, to: newPosition)
-                    }
-                    
-                    return false
-                }
-            }
+        
+        let currentTextView = NSMutableAttributedString(attributedString: textView.attributedText)
+        let testIDKey = NSAttributedString.Key(rawValue: "testID")
+        let range = NSRange(location: 0, length: currentTextView.string.count)
+        currentTextView.enumerateAttribute(testIDKey, in: range) { result, resultRange, _ in
+            guard let result = result as? String else { return }
+            
+            currentTextView.insert(NSAttributedString(string: result), at: resultRange.location)
         }
-        return true
+        
+        print("全てのテキスト:", currentTextView.string)
+        print("チップ全部:", allTipText)
     }
 
 }
 
 struct Tag {
+    let id: Int
     let text: String
     let color: UIColor
 }
