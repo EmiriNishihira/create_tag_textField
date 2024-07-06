@@ -18,6 +18,16 @@ class ViewController: UIViewController, UITextViewDelegate {
         return textView
     }()
     
+    private let plainTextView: UITextView = {
+        let textView = UITextView()
+        textView.font = UIFont.systemFont(ofSize: 16)
+        textView.layer.borderColor = UIColor.gray.cgColor
+        textView.layer.borderWidth = 1
+        textView.layer.cornerRadius = 5
+        textView.isEditable = false
+        return textView
+    }()
+    
     private let tagScrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.showsHorizontalScrollIndicator = false
@@ -59,9 +69,11 @@ class ViewController: UIViewController, UITextViewDelegate {
     
     private func setupUI() {
         view.addSubview(textView)
+        view.addSubview(plainTextView)
         view.addSubview(tagScrollView)
         tagScrollView.addSubview(tagStackView)
         
+        plainTextView.translatesAutoresizingMaskIntoConstraints = false
         textView.translatesAutoresizingMaskIntoConstraints = false
         tagScrollView.translatesAutoresizingMaskIntoConstraints = false
         tagStackView.translatesAutoresizingMaskIntoConstraints = false
@@ -80,7 +92,12 @@ class ViewController: UIViewController, UITextViewDelegate {
             tagStackView.topAnchor.constraint(equalTo: tagScrollView.topAnchor),
             tagStackView.leadingAnchor.constraint(equalTo: tagScrollView.leadingAnchor, constant: 20),
             tagStackView.trailingAnchor.constraint(equalTo: tagScrollView.trailingAnchor, constant: -20),
-            tagStackView.bottomAnchor.constraint(equalTo: tagScrollView.bottomAnchor)
+            tagStackView.bottomAnchor.constraint(equalTo: tagScrollView.bottomAnchor),
+            
+            plainTextView.topAnchor.constraint(equalTo: textView.bottomAnchor, constant: 100),
+            plainTextView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 20),
+            plainTextView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -20),
+            plainTextView.heightAnchor.constraint(equalToConstant: 150)
         ])
         
         textView.delegate = self
@@ -191,9 +208,61 @@ class ViewController: UIViewController, UITextViewDelegate {
             currentTextView.insert(NSAttributedString(string: result), at: resultRange.location)
         }
         
+        let plainText = convertPlainTextToAttributedString(currentTextView.string)
+        plainTextView.attributedText = plainText
         print("全てのテキスト:", currentTextView.string)
-        print("チップ全部:", allTipText)
     }
+    
+    private func convertPlainTextToAttributedString(_ plainText: String) -> NSAttributedString {
+            let attributedString = NSMutableAttributedString(string: plainText)
+            let pattern = "\\$([^$]+)\\$"
+            let regex = try! NSRegularExpression(pattern: pattern, options: [])
+            let fullRange = NSRange(location: 0, length: plainText.count)
+            let testIDKey = NSAttributedString.Key(rawValue: "testID")
+            
+            // 全てのマッチを取得
+            let matches = regex.matches(in: plainText, options: [], range: fullRange)
+            
+            // マッチを逆順に処理
+            for match in matches.reversed() {
+                let tagRange = match.range(at: 1)
+                if let tagRange = Range(tagRange, in: plainText) {
+                    let tagText = String(plainText[tagRange])
+                    
+                    // タグに対応する画像を生成
+                    let label = UILabel()
+                    label.text = tagText
+                    label.backgroundColor = .orange  // または適切な色を選択
+                    label.textColor = .white
+                    label.font = UIFont.systemFont(ofSize: 16)
+                    label.textAlignment = .center
+                    label.layer.cornerRadius = 4
+                    label.layer.masksToBounds = true
+                    let paddedFrame = label.frame.inset(by: UIEdgeInsets(top: -2, left: -5, bottom: -2, right: -5))
+                    label.frame = paddedFrame
+                    label.sizeToFit()
+                    
+                    let renderer = UIGraphicsImageRenderer(size: label.bounds.size)
+                    let image = renderer.image { _ in
+                        label.layer.render(in: UIGraphicsGetCurrentContext()!)
+                    }
+                    
+                    let attachment = NSTextAttachment()
+                    attachment.image = image
+                    
+                    let tip = NSAttributedString(attachment: attachment)
+                    
+                    // 元のタグテキストを画像に置き換え
+                    attributedString.replaceCharacters(in: match.range, with: tip)
+                    
+                    // testIDKey属性を設定
+                    let newRange = NSRange(location: match.range.location, length: 1)
+                    attributedString.addAttribute(testIDKey, value: "$\(tagText)$", range: newRange)
+                }
+            }
+            
+            return attributedString
+        }
 
 }
 
